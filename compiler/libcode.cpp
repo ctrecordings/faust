@@ -1515,9 +1515,8 @@ static void generateCode(Tree signals, int numInputs, int numOutputs, bool gener
 #endif
         } else if (startWith(gGlobal->gOutputLang, "dlang")) {
 #ifdef DLANG_BUILD
-            // FIR is generated with internal real instead of FAUSTFLOAT (see InstBuilder::genBasicTyped)
-            gGlobal->gFAUSTFLOAT2Internal = true;
-            container = DLangCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs, dst.get());
+            container = DLangCodeContainer::createContainer(gGlobal->gClassName, gGlobal->gSuperClassName, numInputs,
+                                                            numOutputs, dst.get());
 #else
             throw faustexception("ERROR : -lang dlang not supported since D backend is not built\n");
 #endif

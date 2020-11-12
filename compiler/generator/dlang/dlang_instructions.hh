@@ -1,7 +1,7 @@
 /************************************************************************
  ************************************************************************
     FAUST compiler
-    Copyright (C) 2017 GRAME, Centre National de Creation Musicale
+    Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -22,134 +22,76 @@
 #ifndef _DLANG_INSTRUCTIONS_H
 #define _DLANG_INSTRUCTIONS_H
 
-#include "text_instructions.hh"
-#include "Text.hh"
-
 using namespace std;
 
-// Visitor used to initialize fields into the DSP constructor
-struct DLangInitFieldsVisitor : public DispatchVisitor {
-    std::ostream* fOut;
-    int           fTab;
-
-    DLangInitFieldsVisitor(std::ostream* out, int tab = 0) : fOut(out), fTab(tab) {}
-
-    virtual void visit(DeclareVarInst* inst)
-    {
-        tab(fTab, *fOut);
-        *fOut << inst->fAddress->getName() << ": ";
-        ZeroInitializer(fOut, inst->fType);
-        if (inst->fAddress->getAccess() & Address::kStruct) *fOut << ",";
-    }
-
-    // Generate zero intialisation code for simple int/real scalar and arrays types
-    static void ZeroInitializer(std::ostream* fOut, Typed* typed)
-    {
-        Typed::VarType type       = typed->getType();
-        ArrayTyped*    array_type = dynamic_cast<ArrayTyped*>(typed);
-
-        if (array_type) {
-            if (isIntPtrType(type)) {
-                *fOut << "[0;" << array_type->fSize << "]";
-            } else if (isRealPtrType(type)) {
-                *fOut << "[0.0;" << array_type->fSize << "]";
-            }
-        } else {
-            if (isIntType(type)) {
-                *fOut << "0";
-            } else if (isRealType(type)) {
-                *fOut << "0.0";
-            }
-        }
-    }
-};
+#include "text_instructions.hh"
+#include "type_manager.hh"
 
 class DLangInstVisitor : public TextInstVisitor {
    private:
     /*
      Global functions names table as a static variable in the visitor
-     so that each function prototype is generated as most once in the module.
+     so that each function prototype is generated at most once in the module.
      */
     static map<string, bool> gFunctionSymbolTable;
-    map<string, string>      fMathLibTable;
+
+    // Polymorphic math functions
+    map<string, string> gPolyMathLibTable;
 
    public:
     using TextInstVisitor::visit;
 
-    DLangInstVisitor(std::ostream* out, const string& structname, int tab = 0)
-        : TextInstVisitor(out, ".", new DLangStringTypeManager(xfloat(), "&"), tab)
+    DLangInstVisitor(std::ostream* out, int tab = 0) : TextInstVisitor(out, ".", ifloat(), "[]", tab)
     {
-        fTypeManager->fTypeDirectTable[Typed::kObj]     = "";
-        fTypeManager->fTypeDirectTable[Typed::kObj_ptr] = "";
+        // Mark all math.h functions as generated...
+        gFunctionSymbolTable["abs"] = true;
 
-        // Integer version
-        fMathLibTable["abs"]   = "i32::abs";
-        fMathLibTable["min_i"] = "std::cmp::min";
-        fMathLibTable["max_i"] = "std::cmp::max";
+        gFunctionSymbolTable["max"] = true;
+        gFunctionSymbolTable["min"] = true;
 
         // Float version
-        fMathLibTable["fabsf"]      = "f32::abs";
-        fMathLibTable["acosf"]      = "f32::acos";
-        fMathLibTable["asinf"]      = "f32::asin";
-        fMathLibTable["atanf"]      = "f32::atan";
-        fMathLibTable["atan2f"]     = "f32::atan2";
-        fMathLibTable["ceilf"]      = "f32::ceil";
-        fMathLibTable["cosf"]       = "f32::cos";
-        fMathLibTable["expf"]       = "f32::exp";
-        fMathLibTable["floorf"]     = "f32::floor";
-        fMathLibTable["fmodf"]      = "libm::fmodf";
-        fMathLibTable["logf"]       = "f32::log";
-        fMathLibTable["log10f"]     = "f32::log10";
-        fMathLibTable["max_f"]      = "f32::max";
-        fMathLibTable["min_f"]      = "f32::min";
-        fMathLibTable["powf"]       = "f32::powf";
-        fMathLibTable["remainderf"] = "f32::rem_euclid";
-        //fMathLibTable["rintf"]      = "linux_api_math::rintf"; // TODO
-        fMathLibTable["rintf"]      = "f32::round";
-        fMathLibTable["roundf"]     = "f32::round";
-        fMathLibTable["sinf"]       = "f32::sin";
-        fMathLibTable["sqrtf"]      = "f32::sqrt";
-        fMathLibTable["tanf"]       = "f32::tan";
-
-        // Additional hyperbolic math functions
-        fMathLibTable["acoshf"]     = "f32::acosh";
-        fMathLibTable["asinhf"]     = "f32::asinh";
-        fMathLibTable["atanhf"]     = "f32::atanh";
-        fMathLibTable["coshf"]      = "f32::cosh";
-        fMathLibTable["sinhf"]      = "f32::sinh";
-        fMathLibTable["tanhf"]      = "f32::tanh";
+        gFunctionSymbolTable["fabsf"]      = true;
+        gFunctionSymbolTable["acosf"]      = true;
+        gFunctionSymbolTable["asinf"]      = true;
+        gFunctionSymbolTable["atanf"]      = true;
+        gFunctionSymbolTable["atan2f"]     = true;
+        gFunctionSymbolTable["ceilf"]      = true;
+        gFunctionSymbolTable["cosf"]       = true;
+        gFunctionSymbolTable["expf"]       = true;
+        gFunctionSymbolTable["exp10f"]     = true;
+        gFunctionSymbolTable["floorf"]     = true;
+        gFunctionSymbolTable["fmodf"]      = true;
+        gFunctionSymbolTable["logf"]       = true;
+        gFunctionSymbolTable["log10f"]     = true;
+        gFunctionSymbolTable["powf"]       = true;
+        gFunctionSymbolTable["remainderf"] = true;
+        gFunctionSymbolTable["rintf"]      = true;
+        gFunctionSymbolTable["roundf"]     = true;
+        gFunctionSymbolTable["sinf"]       = true;
+        gFunctionSymbolTable["sqrtf"]      = true;
+        gFunctionSymbolTable["tanf"]       = true;
 
         // Double version
-        fMathLibTable["fabs"]      = "f64::abs";
-        fMathLibTable["acos"]      = "f64::acos";
-        fMathLibTable["asin"]      = "f64::asin";
-        fMathLibTable["atan"]      = "f64::atan";
-        fMathLibTable["atan2"]     = "f64::atan2";
-        fMathLibTable["ceil"]      = "f64::ceil";
-        fMathLibTable["cos"]       = "f64::cos";
-        fMathLibTable["exp"]       = "f64::exp";
-        fMathLibTable["floor"]     = "f64::floor";
-        fMathLibTable["fmod"]      = "libm::fmod";
-        fMathLibTable["log"]       = "f64::log";
-        fMathLibTable["log10"]     = "f64::log10";
-        fMathLibTable["max_"]      = "f64::max";
-        fMathLibTable["min_"]      = "f64::min";
-        fMathLibTable["pow"]       = "f64::powf";
-        fMathLibTable["remainder"] = "f64::rem_euclid";
-        //fMathLibTable["rint"]      = "linux_api_math::rint";  // TODO
-        fMathLibTable["rint"]      = "f64::round";
-        fMathLibTable["round"]     = "f64::round";
-        fMathLibTable["sin"]       = "f64::sin";
-        fMathLibTable["sqrt"]      = "f64::sqrt";
-        fMathLibTable["tan"]       = "f64::tan";
-
-        // Additional hyperbolic math functions
-        fMathLibTable["acosh"]     = "f64::acosh";
-        fMathLibTable["asinh"]     = "f64::asinh";
-        fMathLibTable["atanh"]     = "f64::atanh";
-        fMathLibTable["cosh"]      = "f64::cosh";
-        fMathLibTable["sinh"]      = "f64::sinh";
-        fMathLibTable["tanh"]      = "f64::tanh";
+        gFunctionSymbolTable["fabs"]      = true;
+        gFunctionSymbolTable["acos"]      = true;
+        gFunctionSymbolTable["asin"]      = true;
+        gFunctionSymbolTable["atan"]      = true;
+        gFunctionSymbolTable["atan2"]     = true;
+        gFunctionSymbolTable["ceil"]      = true;
+        gFunctionSymbolTable["cos"]       = true;
+        gFunctionSymbolTable["exp"]       = true;
+        gFunctionSymbolTable["exp10"]     = true;
+        gFunctionSymbolTable["floor"]     = true;
+        gFunctionSymbolTable["fmod"]      = true;
+        gFunctionSymbolTable["log"]       = true;
+        gFunctionSymbolTable["log10"]     = true;
+        gFunctionSymbolTable["pow"]       = true;
+        gFunctionSymbolTable["remainder"] = true;
+        gFunctionSymbolTable["rint"]      = true;
+        gFunctionSymbolTable["round"]     = true;
+        gFunctionSymbolTable["sin"]       = true;
+        gFunctionSymbolTable["sqrt"]      = true;
+        gFunctionSymbolTable["tan"]       = true;
     }
 
     virtual ~DLangInstVisitor() {}
@@ -158,10 +100,10 @@ class DLangInstVisitor : public TextInstVisitor {
     {
         // Special case
         if (inst->fZone == "0") {
-            *fOut << "ui_interface.declare(&mut self.fDummy, " << quote(inst->fKey) << ", " << quote(inst->fValue)
+            *fOut << "ui_interface.declare(" << inst->fZone << ", " << quote(inst->fKey) << ", " << quote(inst->fValue)
                   << ")";
         } else {
-            *fOut << "ui_interface.declare(&mut self." << inst->fZone << ", " << quote(inst->fKey) << ", "
+            *fOut << "ui_interface.declare(&" << inst->fZone << ", " << quote(inst->fKey) << ", "
                   << quote(inst->fValue) << ")";
         }
         EndLine();
@@ -172,13 +114,13 @@ class DLangInstVisitor : public TextInstVisitor {
         string name;
         switch (inst->fOrient) {
             case OpenboxInst::kVerticalBox:
-                name = "ui_interface.open_vertical_box(";
+                name = "ui_interface.openVerticalBox(";
                 break;
             case OpenboxInst::kHorizontalBox:
-                name = "ui_interface.open_horizontal_box(";
+                name = "ui_interface.openHorizontalBox(";
                 break;
             case OpenboxInst::kTabBox:
-                name = "ui_interface.open_tab_box(";
+                name = "ui_interface.openTabBox(";
                 break;
         }
         *fOut << name << quote(inst->fName) << ")";
@@ -187,16 +129,16 @@ class DLangInstVisitor : public TextInstVisitor {
 
     virtual void visit(CloseboxInst* inst)
     {
-        *fOut << "ui_interface.close_box();";
+        *fOut << "ui_interface.closeBox();";
         tab(fTab, *fOut);
     }
 
     virtual void visit(AddButtonInst* inst)
     {
         if (inst->fType == AddButtonInst::kDefaultButton) {
-            *fOut << "ui_interface.add_button(" << quote(inst->fLabel) << ", &mut self." << inst->fZone << ")";
+            *fOut << "ui_interface.addButton(" << quote(inst->fLabel) << ", &" << inst->fZone << ")";
         } else {
-            *fOut << "ui_interface.add_check_button(" << quote(inst->fLabel) << ", &mut self." << inst->fZone << ")";
+            *fOut << "ui_interface.addCheckButton(" << quote(inst->fLabel) << ", &" << inst->fZone << ")";
         }
         EndLine();
     }
@@ -206,17 +148,17 @@ class DLangInstVisitor : public TextInstVisitor {
         string name;
         switch (inst->fType) {
             case AddSliderInst::kHorizontal:
-                name = "ui_interface.add_horizontal_slider";
+                name = "ui_interface.addHorizontalSlider";
                 break;
             case AddSliderInst::kVertical:
-                name = "ui_interface.add_vertical_slider";
+                name = "ui_interface.addVerticalSlider";
                 break;
             case AddSliderInst::kNumEntry:
-                name = "ui_interface.add_num_entry";
+                name = "ui_interface.addNumEntry";
                 break;
         }
         *fOut << name << "(" << quote(inst->fLabel) << ", "
-              << "&mut self." << inst->fZone << ", " << checkReal(inst->fInit) << ", " << checkReal(inst->fMin) << ", "
+              << "&" << inst->fZone << ", " << checkReal(inst->fInit) << ", " << checkReal(inst->fMin) << ", "
               << checkReal(inst->fMax) << ", " << checkReal(inst->fStep) << ")";
         EndLine();
     }
@@ -226,38 +168,55 @@ class DLangInstVisitor : public TextInstVisitor {
         string name;
         switch (inst->fType) {
             case AddBargraphInst::kHorizontal:
-                name = "ui_interface.add_horizontal_bargraph";
+                name = "ui_interface.addHorizontalBargraph";
                 break;
             case AddBargraphInst::kVertical:
-                name = "ui_interface.add_vertical_bargraph";
+                name = "ui_interface.addVerticalBargraph";
                 break;
         }
-        *fOut << name << "(" << quote(inst->fLabel) << ", &mut self." << inst->fZone << ", " << checkReal(inst->fMin)
-              << ", " << checkReal(inst->fMax) << ")";
+        *fOut << name << "(" << quote(inst->fLabel) << ", &" << inst->fZone << ", " << checkReal(inst->fMin) << ", "
+              << checkReal(inst->fMax) << ")";
+        EndLine();
+    }
+
+    virtual void visit(AddSoundfileInst* inst)
+    {
+        *fOut << "ui_interface.addSoundfile(" << quote(inst->fLabel) << ", " << quote(inst->fURL) << ", &"
+              << inst->fSFZone << ")";
         EndLine();
     }
 
     virtual void visit(DeclareVarInst* inst)
     {
+        if (inst->fAddress->getAccess() & Address::kConst) {
+            *fOut << "const ";
+        }
+
         if (inst->fAddress->getAccess() & Address::kStaticStruct) {
-            *fOut << "static mut ";
+            *fOut << "static ";
         }
 
-        if (inst->fAddress->getAccess() & Address::kStack || inst->fAddress->getAccess() & Address::kLoop) {
-            *fOut << "let mut ";
+        if (inst->fAddress->getAccess() & Address::kVolatile) {
+            *fOut << "volatile ";
         }
-
-        *fOut << fTypeManager->generateType(inst->fType, inst->fAddress->getName());
-
-        if (inst->fValue) {
-            *fOut << " = ";
-            inst->fValue->accept(this);
-        } else if (inst->fAddress->getAccess() & Address::kStaticStruct) {
-            *fOut << " = ";
-            DLangInitFieldsVisitor::ZeroInitializer(fOut, inst->fType);
+        ArrayTyped* array_typed = dynamic_cast<ArrayTyped*>(inst->fType);
+        if (array_typed && array_typed->fSize > 1) {
+            string type = fTypeManager->fTypeDirectTable[array_typed->fType->getType()];
+            if (inst->fValue) {
+                *fOut << type << "[] " << inst->fAddress->getName() << " = ";
+                inst->fValue->accept(this);
+            } else {
+                *fOut << type << "[] " << inst->fAddress->getName() << " = new " << type << "[" << array_typed->fSize
+                      << "]";
+            }
+        } else {
+            *fOut << fTypeManager->generateType(inst->fType, inst->fAddress->getName());
+            if (inst->fValue) {
+                *fOut << " = ";
+                inst->fValue->accept(this);
+            }
         }
-
-        EndLine((inst->fAddress->getAccess() & Address::kStruct) ? ',' : ';');
+        EndLine();
     }
 
     virtual void visit(DeclareFunInst* inst)
@@ -269,89 +228,28 @@ class DLangInstVisitor : public TextInstVisitor {
             gFunctionSymbolTable[inst->fName] = true;
         }
 
-        // Only generates additional functions
-        if (fMathLibTable.find(inst->fName) == fMathLibTable.end()) {
-            // Prototype
-            // Since functions are attached to a trait they must not be prefixed with "pub".
-            // In case we need a mechanism to attach functions to both traits and normal
-            // impls, we need a mechanism to forward the information whether to use "pub"
-            // or not. In the worst case, we have to prefix the name string like "pub fname",
-            // and handle the prefix here.
-            *fOut << "fn " << inst->fName;
-            generateFunDefArgs(inst);
-            generateFunDefBody(inst);
+        // Defined as macro in the architecture file...
+        if (checkMinMax(inst->fName)) {
+            return;
         }
-    }
 
-    virtual void generateFunDefBody(DeclareFunInst* inst)
-    {
-        *fOut << ") -> " << fTypeManager->generateType(inst->fType->fResult);
-        if (inst->fCode->fCode.size() == 0) {
-            *fOut << ";" << endl;  // Pure prototype
-        } else {
-            // Function body
-            *fOut << " {";
-            fTab++;
-            tab(fTab, *fOut);
-            inst->fCode->accept(this);
-            fTab--;
-            back(1, *fOut);
-            *fOut << "}";
-            tab(fTab, *fOut);
+        // Prototype arguments
+        if (inst->fType->fAttribute & FunTyped::kInline) {
+            *fOut << "inline ";
         }
-    }
 
-    virtual void visit(RetInst* inst)
-    {
-        if (inst->fResult) {
-            //*fOut << "return ";
-            inst->fResult->accept(this);
-        } else {
-            *fOut << "return";
-            EndLine();
+        if (inst->fType->fAttribute & FunTyped::kVirtual) {
+            *fOut << "abstract ";
         }
-    }
 
-    virtual void visit(NamedAddress* named)
-    {
-        if (named->getAccess() & Address::kStruct) {
-            if (named->getAccess() & Address::kReference && named->getAccess() & Address::kMutable) {
-                *fOut << "&mut self.";
-            } else {
-                *fOut << "self.";
-            }
-        } else if (named->getAccess() & Address::kStaticStruct) {
-            if (named->getAccess() & Address::kReference && named->getAccess() & Address::kMutable) {
-                *fOut << "&mut ";
-            }
+        if (inst->fType->fAttribute & FunTyped::kLocal || inst->fType->fAttribute & FunTyped::kStatic) {
+            *fOut << "static ";
         }
-        *fOut << named->getName();
-    }
 
-    virtual void visit(IndexedAddress* indexed)
-    {
-        indexed->fAddress->accept(this);
-        if (dynamic_cast<Int32NumInst*>(indexed->fIndex)) {
-            *fOut << "[";
-            indexed->fIndex->accept(this);
-            *fOut << "]";
-        } else {
-            // Array index expression casted to 'usize' type
-            *fOut << "[";
-            indexed->fIndex->accept(this);
-            *fOut << " as usize]";
-        }
-    }
-
-    virtual void visit(LoadVarInst* inst)
-    {
-        if (inst->fAddress->getAccess() & Address::kStaticStruct) {
-            *fOut << "unsafe { ";
-        }
-        inst->fAddress->accept(this);
-        if (inst->fAddress->getAccess() & Address::kStaticStruct) {
-            *fOut << " }";
-        }
+        // Prototype
+        *fOut << fTypeManager->generateType(inst->fType->fResult, generateFunName(inst->fName));
+        generateFunDefArgs(inst);
+        generateFunDefBody(inst);
     }
 
     virtual void visit(LoadVarAddressInst* inst)
@@ -360,119 +258,78 @@ class DLangInstVisitor : public TextInstVisitor {
         inst->fAddress->accept(this);
     }
 
-    virtual void visit(FloatArrayNumInst* inst)
-    {
-        char sep = '[';
-        for (size_t i = 0; i < inst->fNumTable.size(); i++) {
-            *fOut << sep << checkFloat(inst->fNumTable[i]);
-            sep = ',';
-        }
-        *fOut << ']';
-    }
-
-    virtual void visit(Int32ArrayNumInst* inst)
-    {
-        char sep = '[';
-        for (size_t i = 0; i < inst->fNumTable.size(); i++) {
-            *fOut << sep << inst->fNumTable[i];
-            sep = ',';
-        }
-        *fOut << ']';
-    }
-
-    virtual void visit(DoubleArrayNumInst* inst)
-    {
-        char sep = '[';
-        for (size_t i = 0; i < inst->fNumTable.size(); i++) {
-            *fOut << sep << checkDouble(inst->fNumTable[i]);
-            sep = ',';
-        }
-        *fOut << ']';
-    }
-
     virtual void visit(::CastInst* inst)
     {
-        *fOut << "(";
-        inst->fInst->accept(this);
-        *fOut << " as " << fTypeManager->generateType(inst->fType);
-        *fOut << ")";
+        string type = fTypeManager->generateType(inst->fType);
+        if (endWith(type, "*")) {
+            *fOut << "static_cast<" << type << ">(";
+            inst->fInst->accept(this);
+            *fOut << ")";
+        } else {
+            *fOut << type << "(";
+            inst->fInst->accept(this);
+            *fOut << ")";
+        }
     }
 
-    virtual void visit(BitcastInst* inst) { faustassert(false); }
+    /*
+     Indexed adresses can actually be values in an array or fields in a struct type
+     */
+    virtual void visit(IndexedAddress* indexed)
+    {
+        indexed->fAddress->accept(this);
+        DeclareStructTypeInst* struct_type = isStructType(indexed->getName());
+        if (struct_type) {
+            Int32NumInst* field_index = static_cast<Int32NumInst*>(indexed->fIndex);
+            *fOut << "." << struct_type->fType->getName(field_index->fNum);
+        } else {
+            if (dynamic_cast<Int32NumInst*>(indexed->fIndex)) {
+                *fOut << "[";
+                indexed->fIndex->accept(this);
+                *fOut << "]";
+            } else {
+                // wrap code is automatically added by the SOUL compiler (and the same if [idex] syntax is used)
+                *fOut << ".at (";
+                indexed->fIndex->accept(this);
+                *fOut << ")";
+            }
+        }
+    }
+
+    virtual void visit(BitcastInst* inst)
+    {
+        switch (inst->fType->getType()) {
+            case Typed::kInt32:
+                *fOut << "*reinterpret_cast<int*>(&";
+                inst->fInst->accept(this);
+                *fOut << ")";
+                break;
+            case Typed::kInt64:
+                *fOut << "*reinterpret_cast<long long*>(&";
+                inst->fInst->accept(this);
+                *fOut << ")";
+                break;
+            case Typed::kFloat:
+                *fOut << "*reinterpret_cast<float*>(&";
+                inst->fInst->accept(this);
+                *fOut << ")";
+                break;
+            case Typed::kDouble:
+                *fOut << "*reinterpret_cast<double*>(&";
+                inst->fInst->accept(this);
+                *fOut << ")";
+                break;
+            default:
+                faustassert(false);
+                break;
+        }
+    }
 
     virtual void visit(FunCallInst* inst)
     {
-        if (fMathLibTable.find(inst->fName) != fMathLibTable.end()) {
-            generateFunCall(inst, fMathLibTable[inst->fName]);
-        } else {
-            generateFunCall(inst, inst->fName);
-        }
-    }
-
-    virtual void generateFunCall(FunCallInst* inst, const std::string& fun_name)
-    {
-        if (inst->fMethod) {
-            list<ValueInst*>::const_iterator it = inst->fArgs.begin();
-            // Compile object arg
-            (*it)->accept(this);
-            // Compile parameters
-            *fOut << fObjectAccess;
-            // Hack for 1 FIR generated names
-            if (startWith(fun_name, "instanceInit")) {
-                *fOut << "instance_init" << fun_name.substr(12) << "(";
-            } else {
-                *fOut << fun_name << "(";
-            }
-            generateFunCallArgs(++it, inst->fArgs.end(), int(inst->fArgs.size()) - 1);
-        } else {
-            *fOut << fun_name << "(";
-            // Compile parameters
-            generateFunCallArgs(inst->fArgs.begin(), inst->fArgs.end(), int(inst->fArgs.size()));
-            // Hack for 'log' function that needs a base
-            if (fun_name == "f32::log") {
-                *fOut << ", std::f32::consts::E";
-            } else if (fun_name == "f64::log") {
-                *fOut << ", std::f64::consts::E";
-            }
-        }
-        *fOut << ")";
-    }
-
-    virtual void visit(Select2Inst* inst)
-    {
-        *fOut << "if (";
-        inst->fCond->accept(this);
-        // Force 'cond' to bool type
-        *fOut << " as i32 != 0) { ";
-        inst->fThen->accept(this);
-        *fOut << " } else { ";
-        inst->fElse->accept(this);
-        *fOut << " }";
-    }
-
-    virtual void visit(IfInst* inst)
-    {
-        *fOut << "if (";
-        inst->fCond->accept(this);
-        // Force 'cond' to bool type
-        *fOut << " as i32 == 1) { ";
-        fTab++;
-        tab(fTab, *fOut);
-        inst->fThen->accept(this);
-        fTab--;
-        tab(fTab, *fOut);
-        if (inst->fElse->fCode.size() > 0) {
-            *fOut << "} else {";
-            fTab++;
-            tab(fTab, *fOut);
-            inst->fElse->accept(this);
-            fTab--;
-            tab(fTab, *fOut);
-            *fOut << "}";
-        } else {
-            *fOut << "}";
-        }
-        tab(fTab, *fOut);
+        string name = gGlobal->getMathFunction(inst->fName);
+        name = (gPolyMathLibTable.find(name) != gPolyMathLibTable.end()) ? gPolyMathLibTable[name] : name;
+        generateFunCall(inst, name);
     }
 
     virtual void visit(ForLoopInst* inst)
@@ -480,81 +337,19 @@ class DLangInstVisitor : public TextInstVisitor {
         // Don't generate empty loops...
         if (inst->fCode->size() == 0) return;
 
-        inst->fInit->accept(this);
-        *fOut << "loop {";
-        fTab++;
-        tab(fTab, *fOut);
-        inst->fCode->accept(this);
-        inst->fIncrement->accept(this);
-        *fOut << "if ";
-        inst->fEnd->accept(this);
-        *fOut << " { continue; } else { break; }";
-        fTab--;
-        tab(fTab, *fOut);
-        *fOut << "}";
-        tab(fTab, *fOut);
-    }
-
-    virtual void visit(SimpleForLoopInst* inst)
-    {
-        // Don't generate empty loops...
-        if (inst->fCode->size() == 0) return;
-
-        *fOut << "for " << inst->getName() << " in ";
-        if (inst->fReverse) {
-            *fOut << "(";
-            inst->fLowerBound->accept(this);
-            *fOut << "..=";
-            inst->fUpperBound->accept(this);
-            *fOut << ").rev()";
-        } else {
-            inst->fLowerBound->accept(this);
-            *fOut << "..";
-            inst->fUpperBound->accept(this);
-        }
-        *fOut << " {";
-        fTab++;
-        tab(fTab, *fOut);
-        inst->fCode->accept(this);
-        fTab--;
-        back(1, *fOut);
-        *fOut << "}";
-        tab(fTab, *fOut);
-    }
-
-    virtual void visit(::SwitchInst* inst)
-    {
-        *fOut << "match (";
-        inst->fCond->accept(this);
-        *fOut << ") {";
-        fTab++;
-        tab(fTab, *fOut);
-        for (auto& it : inst->fCode) {
-            if (it.first == -1) {  // -1 used to code "default" case
-                *fOut << "_ => {";
-            } else {
-                *fOut << it.first << " => {";
-            }
-            fTab++;
-            tab(fTab, *fOut);
-            (it.second)->accept(this);
-            /*
-            if (!((*it).second)->hasReturn()) {
-                *fOut << "break;";
-            }
-            */
-            fTab--;
-            back(1, *fOut);
-            *fOut << "},";
+        if (gGlobal->gClang && !inst->fIsRecursive) {
+            *fOut << "#pragma clang loop vectorize(enable) interleave(enable)";
             tab(fTab, *fOut);
         }
-        fTab--;
-        back(1, *fOut);
-        *fOut << "} ";
-        tab(fTab, *fOut);
+        TextInstVisitor::visit(inst);
     }
 
     static void cleanup() { gFunctionSymbolTable.clear(); }
+};
+
+class DLangVecInstVisitor : public DLangInstVisitor {
+   public:
+    DLangVecInstVisitor(std::ostream* out, int tab = 0) : DLangInstVisitor(out, tab) {}
 };
 
 #endif

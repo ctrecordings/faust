@@ -1,7 +1,7 @@
 /************************************************************************
  ************************************************************************
     FAUST compiler
-    Copyright (C) 2017 GRAME, Centre National de Creation Musicale
+    Copyright (C) 2003-2018 GRAME, Centre National de Creation Musicale
     ---------------------------------------------------------------------
     This program is free software; you can redistribute it and/or modify
     it under the terms of the GNU General Public License as published by
@@ -23,71 +23,99 @@
 #define _DLANG_CODE_CONTAINER_H
 
 #include "code_container.hh"
+#include "dlang_instructions.hh"
 #include "dsp_factory.hh"
 #include "omp_code_container.hh"
-#include "dlang_instructions.hh"
 #include "vec_code_container.hh"
 #include "wss_code_container.hh"
-
-using namespace std;
 
 #ifdef WIN32
 #pragma warning(disable : 4250)
 #endif
 
+using namespace std;
+
 class DLangCodeContainer : public virtual CodeContainer {
    protected:
     DLangInstVisitor fCodeProducer;
-    std::ostream*   fOut;
+    std::ostream*  fOut;
+    string         fSuperKlassName;
 
     void produceMetadata(int tabs);
+    void produceInit(int tabs);
 
    public:
-    DLangCodeContainer(const string& name, int numInputs, int numOutputs, std::ostream* out)
-        : fCodeProducer(out, name), fOut(out)
+    DLangCodeContainer(const string& name, const string& super, int numInputs, int numOutputs, std::ostream* out)
+        : fCodeProducer(out), fOut(out), fSuperKlassName(super)
     {
         initialize(numInputs, numOutputs);
         fKlassName = name;
+
+        // For mathematical functions
+        if (gGlobal->gFastMath) {
+            addIncludeFile((gGlobal->gFastMathLib == "def") ? "\"faust/dsp/fastmath.DLang\""
+                                                            : ("\"" + gGlobal->gFastMathLib + "\""));
+        } else {
+            addIncludeFile("<cmath>");
+            addIncludeFile("<algorithm>");
+        }
     }
+
     virtual ~DLangCodeContainer() {}
 
-    virtual void              produceClass();
-    virtual void              generateCompute(int tab) = 0;
-    void                      produceInternal();
+    virtual void produceClass();
+    virtual void generateCompute(int tab) = 0;
+    virtual void produceInternal();
+
     virtual dsp_factory_base* produceFactory();
-    virtual void              produceInfoFunctions(int tabs, const string& classname, const string& obj, bool ismethod, bool isvirtual,TextInstVisitor* producer);
+
+    virtual void printHeader() { CodeContainer::printHeader(*fOut); }
 
     CodeContainer* createScalarContainer(const string& name, int sub_container_type);
 
-    static CodeContainer* createContainer(const string& name, int numInputs, int numOutputs,
+    static CodeContainer* createContainer(const string& name, const string& super, int numInputs, int numOutputs,
                                           ostream* dst = new stringstream());
 };
 
 class DLangScalarCodeContainer : public DLangCodeContainer {
    protected:
    public:
-    DLangScalarCodeContainer(const string& name, int numInputs, int numOutputs, std::ostream* out,
-                            int sub_container_type);
+    DLangScalarCodeContainer(const string& name, const string& super, int numInputs, int numOutputs, std::ostream* out,
+                           int sub_container_type);
     virtual ~DLangScalarCodeContainer()
     {}
 
     void generateCompute(int tab);
 };
 
+class DLangScalarOneSampleCodeContainer : public DLangScalarCodeContainer {
+   protected:
+    virtual void produceClass();
+   public:
+    DLangScalarOneSampleCodeContainer(const string& name, const string& super, int numInputs, int numOutputs, std::ostream* out,
+                                    int sub_container_type)
+    : DLangScalarCodeContainer(name, super, numInputs, numOutputs, out, sub_container_type)
+    {}
+    virtual ~DLangScalarOneSampleCodeContainer()
+    {}
+    
+    void generateCompute(int tab);
+};
+
 class DLangVectorCodeContainer : public VectorCodeContainer, public DLangCodeContainer {
    protected:
    public:
-    DLangVectorCodeContainer(const string& name, int numInputs, int numOutputs, std::ostream* out);
+    DLangVectorCodeContainer(const string& name, const string& super, int numInputs, int numOutputs, std::ostream* out);
     virtual ~DLangVectorCodeContainer()
     {}
 
-    void generateCompute(int n);
+    void generateCompute(int tab);
 };
 
 class DLangOpenMPCodeContainer : public OpenMPCodeContainer, public DLangCodeContainer {
    protected:
    public:
-    DLangOpenMPCodeContainer(const string& name, int numInputs, int numOutputs, std::ostream* out);
+    DLangOpenMPCodeContainer(const string& name, const string& super, int numInputs, int numOutputs, std::ostream* out);
     virtual ~DLangOpenMPCodeContainer()
     {}
 
@@ -97,10 +125,12 @@ class DLangOpenMPCodeContainer : public OpenMPCodeContainer, public DLangCodeCon
 class DLangWorkStealingCodeContainer : public WSSCodeContainer, public DLangCodeContainer {
    protected:
    public:
-    DLangWorkStealingCodeContainer(const string& name, int numInputs, int numOutputs, std::ostream* out);
+    DLangWorkStealingCodeContainer(const string& name, const string& super, int numInputs, int numOutputs,
+                                 std::ostream* out);
     virtual ~DLangWorkStealingCodeContainer()
     {}
 
+    void produceClass();
     void generateCompute(int tab);
 };
 
