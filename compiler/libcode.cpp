@@ -1469,13 +1469,6 @@ static void generateCode(Tree signals, int numInputs, int numOutputs, bool gener
 #else
             throw faustexception("ERROR : -lang wast not supported since WAST backend is not built\n");
 #endif
-#ifdef DLANG_BUILD
-            // FIR is generated with internal real instead of FAUSTFLOAT (see InstBuilder::genBasicTyped)
-            gGlobal->gFAUSTFLOAT2Internal = true;
-            container = DLangCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs, dst.get());
-#else
-            throw faustexception("ERROR : -lang dlang not supported since D backend is not built\n");
-#endif
         } else if (startWith(gGlobal->gOutputLang, "wasm")) {
 #ifdef WASM_BUILD
             gGlobal->gAllowForeignFunction = false;  // No foreign functions
@@ -1519,6 +1512,14 @@ static void generateCode(Tree signals, int numInputs, int numOutputs, bool gener
             }
 #else
             throw faustexception("ERROR : -lang wasm not supported since WASM backend is not built\n");
+#endif
+        } else if (startWith(gGlobal->gOutputLang, "dlang")) {
+#ifdef DLANG_BUILD
+            // FIR is generated with internal real instead of FAUSTFLOAT (see InstBuilder::genBasicTyped)
+            gGlobal->gFAUSTFLOAT2Internal = true;
+            container = DLangCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs, dst.get());
+#else
+            throw faustexception("ERROR : -lang dlang not supported since D backend is not built\n");
 #endif
         } else {
             stringstream error;
