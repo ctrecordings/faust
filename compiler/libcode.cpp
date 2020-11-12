@@ -110,6 +110,10 @@
 #include "wast_code_container.hh"
 #endif
 
+#ifdef DLANG_BUILD
+#include "dlang_code_container.hh"
+#endif
+
 using namespace std;
 
 static unique_ptr<ifstream> injcode;
@@ -169,6 +173,10 @@ static void enumBackends(ostream& out)
 
 #ifdef WASM_BUILD
     out << dspto << "WebAssembly (wast/wasm)" << endl;
+#endif
+
+#ifdef DLANG_BUILD
+    out << dspto << "DLang" << endl;
 #endif
 }
 
@@ -1460,6 +1468,13 @@ static void generateCode(Tree signals, int numInputs, int numOutputs, bool gener
             }
 #else
             throw faustexception("ERROR : -lang wast not supported since WAST backend is not built\n");
+#endif
+#ifdef DLANG_BUILD
+            // FIR is generated with internal real instead of FAUSTFLOAT (see InstBuilder::genBasicTyped)
+            gGlobal->gFAUSTFLOAT2Internal = true;
+            container = DLangCodeContainer::createContainer(gGlobal->gClassName, numInputs, numOutputs, dst.get());
+#else
+            throw faustexception("ERROR : -lang dlang not supported since D backend is not built\n");
 #endif
         } else if (startWith(gGlobal->gOutputLang, "wasm")) {
 #ifdef WASM_BUILD
