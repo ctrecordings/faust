@@ -41,7 +41,7 @@ class DLangInstVisitor : public TextInstVisitor {
    public:
     using TextInstVisitor::visit;
 
-    DLangInstVisitor(std::ostream* out, int tab = 0) : TextInstVisitor(out, ".", ifloat(), "[]", tab)
+    DLangInstVisitor(std::ostream* out, int tab = 0) : TextInstVisitor(out, ".", ifloat(), "*", tab)
     {
         gPolyMathLibTable["abs"]   = "std.math.abs";
         gPolyMathLibTable["max_i"] = "std.algorithm.max";
@@ -264,7 +264,7 @@ class DLangInstVisitor : public TextInstVisitor {
             inst->fInst->accept(this);
             *fOut << ")";
         } else {
-            *fOut << type << "(";
+            *fOut << "cast(" << type << ")(";
             inst->fInst->accept(this);
             *fOut << ")";
         }
