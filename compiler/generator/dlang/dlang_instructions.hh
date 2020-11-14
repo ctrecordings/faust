@@ -250,6 +250,23 @@ class DLangInstVisitor : public TextInstVisitor {
         generateFunDefBody(inst);
     }
 
+    virtual void generateFunDefBody(DeclareFunInst* inst)
+    {
+        if (inst->fCode->fCode.size() == 0) {
+            *fOut << ") nothrow @nogc;" << endl;  // Pure prototype
+        } else {
+            // Function body
+            *fOut << ") nothrow @nogc {";
+            fTab++;
+            tab(fTab, *fOut);
+            inst->fCode->accept(this);
+            fTab--;
+            back(1, *fOut);
+            *fOut << "}";
+            tab(fTab, *fOut);
+        }
+    }
+
     virtual void visit(LoadVarAddressInst* inst)
     {
         *fOut << "&";

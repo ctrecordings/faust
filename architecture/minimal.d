@@ -74,6 +74,8 @@ class UI {
 nothrow:
 @nogc:
     void declare(string id, string key, string value) {}
+    void declare(int id, string key, string value) {}
+    void declare(float* id, string key, string value) {}
 
     // -- layout groups
 
@@ -104,26 +106,26 @@ public:
     int fSamplingFreq;
 }
 
-void main(string[] args)
-{
-    mydsp DSP = new mydsp();
-    writeln("DSP size: " ~ to!string(DSP.sizeof) ~ " bytes\n");
+// void main(string[] args)
+// {
+//     mydsp DSP = new mydsp();
+//     writeln("DSP size: " ~ to!string(DSP.sizeof) ~ " bytes\n");
     
-    // Activate the UI, here that only print the control paths
-    UI ui = new UI();
-    DSP.buildUserInterface(&ui);
+//     // Activate the UI, here that only print the control paths
+//     UI ui = new UI();
+//     DSP.buildUserInterface(&ui);
 
-	float** input = [[0.0f, 0.1f,  0.2f, 0.3f, 0.4f].ptr].ptr;
-	float** output = [[0.0f, 0.0f,  0.0f, 0.0f, 0.0f].ptr].ptr;
+// 	float** input = [[0.0f, 0.1f,  0.2f, 0.3f, 0.4f].ptr].ptr;
+// 	float** output = [[0.0f, 0.0f,  0.0f, 0.0f, 0.0f].ptr].ptr;
 
-	DSP.compute(5, input, output);
+// 	DSP.compute(5, input, output);
 
-    for(int i = 0; (i < 5); ++i)
-    {
-        string s = "Input: " ~ to!string(input[i]) ~ " | Output: " ~ to!string(output[i]);
-        writeln(s);
-    }
-}
+//     for(int i = 0; (i < 5); ++i)
+//     {
+//         string s = "Input: " ~ to!string(input[i]) ~ " | Output: " ~ to!string(output[i]);
+//         writeln(s);
+//     }
+// }
 
 /********************END ARCHITECTURE SECTION (part 2/2)****************/
 
